@@ -1,0 +1,8 @@
+{
+  "type": "forge:add_features",
+  "biomes": "#veinrebirth:end_ores",
+  "features": [
+    "veinrebirth:end_ores"
+  ],
+  "step": "underground_decoration"
+}
