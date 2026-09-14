@@ -1,0 +1,8 @@
+{
+  "type": "forge:add_features",
+  "biomes": "#veinrebirth:emerald_ores",
+  "features": [
+    "veinrebirth:emerald_ores"
+  ],
+  "step": "underground_decoration"
+}
