@@ -1,0 +1,16 @@
+{
+  "type": "forge:remove_features",
+  "biomes": "#veinrebirth:nether_ores",
+  "features": [
+    "minecraft:ore_quartz_nether",
+    "minecraft:ore_quartz_deltas",
+    "minecraft:ore_gold_nether",
+    "minecraft:ore_gold_deltas",
+    "minecraft:ore_ancient_debris_large",
+    "minecraft:ore_debris_small"
+  ],
+  "steps": [
+    "underground_ores",
+    "underground_decoration"
+  ]
+}
