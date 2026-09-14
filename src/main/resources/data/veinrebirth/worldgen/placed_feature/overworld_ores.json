@@ -1,0 +1,11 @@
+{
+  "feature": "veinrebirth:config_ore_overworld",
+  "placement": [
+    {
+      "type": "minecraft:in_square"
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}
