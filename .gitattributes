@@ -1,0 +1,23 @@
+# 换行策略：仓库内统一存 LF，检出时再按平台规则转换。
+# 不写这个文件时，Windows 上 core.autocrlf=true 会把 gradlew 也存成 CRLF，
+# 导致 Linux / macOS 用户 clone 后执行 ./gradlew 报
+#   ./gradlew: /bin/sh^M: bad interpreter
+* text=auto eol=lf
+
+# Windows 批处理必须 CRLF，否则 cmd 解析异常
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# shell 脚本必须 LF
+gradlew text eol=lf
+*.sh    text eol=lf
+
+# 二进制文件不做任何换行转换
+*.jar   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ogg   binary
+*.zip   binary
+*.docx  binary
