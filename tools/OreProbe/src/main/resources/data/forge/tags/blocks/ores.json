@@ -1,0 +1,13 @@
+{
+  "replace": false,
+  "values": [
+    "oreprobe:tin_ore",
+    "oreprobe:deepslate_tin_ore",
+    "oreprobe:lead_deepslate_ore",
+    "oreprobe:silver_ore",
+    "oreprobe:nether_sulfur_ore",
+    "oreprobe:end_platinum_ore",
+    "oreprobe:cobalt_ore",
+    "oreprobe:crystal_deposit"
+  ]
+}
