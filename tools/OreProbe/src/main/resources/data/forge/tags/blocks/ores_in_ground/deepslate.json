@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "oreprobe:deepslate_tin_ore",
+    "oreprobe:lead_deepslate_ore"
+  ]
+}
