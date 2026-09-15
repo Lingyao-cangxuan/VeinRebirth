@@ -48,6 +48,25 @@
 
 改版本号只需动 `gradle.properties` 里的 `mod_version`。
 
+## 开发工具
+
+`tools/` 下是开发期的验证脚本，**不参与构建，也不会打进 jar**——jar 里只有 `src/main/` 的
+Java 代码与数据包。它们负责核对那些在游戏里用肉眼看不出来的事：存档里到底生成了多少矿石、
+清理功能有没有漏掉区块、界面在低分辨率下会不会越界。
+
+| 文件 | 用途 |
+| --- | --- |
+| `audit_ore_variants.py` | 扫描整合包内所有模组，列出「浅层矿石缺少深板岩变体」的条目——这类矿物被接管后会在深层长出浅层矿石 |
+| `gui_layout_check.py` | 把界面布局算法复刻成纯算术，穷举分辨率检查控件越界 / 重叠 / 文字溢出，不依赖游戏 |
+| `verify_jar.py` | 校验构建产物：占位符是否展开、是否完成 SRG 重映射、数据包是否完整 |
+| `OreProbe/` | 测试用假模组，注册锡 / 银 / 铅等假矿石与 `forge` 标签，用来验证「自动识别第三方模组矿物」这条链路。**不要放进正式整合包** |
+
+```bash
+python tools/audit_ore_variants.py <你的 mods 目录> -o 报告.md
+python tools/verify_jar.py          # 不带参数时自动取 build/libs 下最新的产物
+python tools/gui_layout_check.py
+```
+
 ## 文档
 
 仓库内：
