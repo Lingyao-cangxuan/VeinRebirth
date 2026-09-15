@@ -1,9 +1,22 @@
-"""校验构建产物的 jar：占位符展开、srg 重映射、数据包完整性。"""
+"""校验构建产物的 jar：占位符展开、srg 重映射、数据包完整性。
+
+用法（在工程根目录执行）：
+    python tools/verify_jar.py                       # 自动取 build/libs 下最新的产物
+    python tools/verify_jar.py build/libs/veinrebirth-1.2.1.jar
+"""
+import glob
+import os
 import re
 import sys
 import zipfile
 
-jar = sys.argv[1] if len(sys.argv) > 1 else "build/libs/veinrebirth-1.2.0.jar"
+if len(sys.argv) > 1:
+    jar = sys.argv[1]
+else:
+    cands = [p for p in glob.glob("build/libs/veinrebirth-*.jar")
+             if not re.search(r"-(sources|javadoc|dev|slim)\.jar$", p)]
+    cands.sort(key=os.path.getmtime, reverse=True)
+    jar = cands[0] if cands else "build/libs/veinrebirth-1.2.1.jar"
 z = zipfile.ZipFile(jar)
 names = z.namelist()
 print("jar: %s" % jar)
