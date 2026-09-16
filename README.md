@@ -12,7 +12,7 @@
 | 项 | 内容 |
 | --- | --- |
 | 模组 ID | `veinrebirth` |
-| 当前版本 | 1.2.1 |
+| 当前版本 | 1.2.2 |
 | 适用环境 | Minecraft 1.20.1 + Forge 47.x（开发基线 47.3.22） |
 | 运行侧 | 客户端 + 服务端（单人 / 多人皆可） |
 | 前置模组 | 无 |
@@ -24,6 +24,7 @@
 - **自动识别其它模组的矿石**——扫方块注册表 + `forge:ores` 标签，默认不接管，可逐种开启
 - **游戏内中文滑块界面**——左侧为可垂直滚动的矿物列表（带搜索框），按「原版矿物 / 各模组」分节
 - **内置 5 套预设 + 分享码**——整套数值压成 112 字符左右的文本，可直接在聊天栏里整段发给别人
+  （命令输出的那行码点一下就复制，**需先按 `T` 把聊天栏打开**；界面里另有一键「复制此码」）
 - **区块矿物刷新**——`/veinrebirth refresh [半径] [clean | clean all]`，让旧区块按新配置重新生成或清除残留
 - **大型矿脉可控**——1.18+ 的铜矿脉 / 铁矿脉可单独调节
 
@@ -43,7 +44,7 @@
 需要 JDK 17：
 
 ```bash
-./gradlew build          # 产物：build/libs/veinrebirth-1.2.1.jar
+./gradlew build          # 产物：build/libs/veinrebirth-1.2.2.jar
 ```
 
 改版本号只需动 `gradle.properties` 里的 `mod_version`。
@@ -73,7 +74,7 @@ python tools/gui_layout_check.py
 
 | 文件 | 说明 |
 | --- | --- |
-| `CHANGELOG.md` | 更新日志（1.0.0 → 1.2.1） |
+| `CHANGELOG.md` | 更新日志（1.0.0 → 1.2.2） |
 | `LICENSE` | MIT 许可全文（与 `src/main/resources/LICENSE` 同一份） |
 
 随发布一起分发（与 jar 同级）：
