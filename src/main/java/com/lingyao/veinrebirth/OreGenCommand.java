@@ -42,7 +42,7 @@ import net.minecraftforge.event.RegisterCommandsEvent;
  * /veinrebirth info &lt;矿物&gt;             查看某种矿物的当前数值
  * /veinrebirth set &lt;矿物&gt; &lt;字段&gt; &lt;值&gt;   直接修改某个字段
  * /veinrebirth preset [名称]            列出预设方案 / 套用某个预设
- * /veinrebirth share                    生成分享码（点击复制，同时写入文件）
+ * /veinrebirth share                    生成分享码（按 T 打开聊天栏后点击复制，同时写入文件）
  * /veinrebirth share import &lt;码|file&gt;   从分享码或文件导入整套数值
  * /veinrebirth defaults                 全部恢复默认值
  * /veinrebirth selftest                 自检：岩层判定表 + 「浅层方块绝不挂深板岩规则」不变量
@@ -577,17 +577,27 @@ public final class OreGenCommand {
         }
 
         source.sendSuccess(() -> Component.literal("§6===== §e分享码 §7（" + code.length()
-                + " 字符，鼠标悬停查看用法）§6====="), false);
+                + " 字符）§6====="), false);
+
+        // 必须写清楚「按 T」：原版只在聊天栏打开着的时候才处理鼠标点击，而玩家回车执行命令后
+        // 聊天栏会自动关闭 —— 此时分享码只是 HUD 左下角的一行贴纸，鼠标点上去毫无反应。
+        // 不写这句，玩家十有八九会去点屏幕上那行字，然后以为复制功能是坏的。
+        source.sendSuccess(() -> Component.literal(
+                "§7按 §fT §7打开聊天栏，点击下面的 §b蓝色分享码§7 或 §b[复制]§7 按钮即可复制完整码。"), false);
 
         // 码太长时聊天栏里只显示开头，但点击复制的始终是完整码
         String display = code.length() <= CHAT_SAFE_LENGTH
-                ? "§b" + code
-                : "§b" + code.substring(0, PREVIEW_LENGTH) + "§8…（余下 "
+                ? code
+                : code.substring(0, PREVIEW_LENGTH) + "§8…（余下 "
                         + (code.length() - PREVIEW_LENGTH) + " 字符已省略）";
-        Component clickable = Component.literal(display).withStyle(Style.EMPTY
+        // 前缀按钮与码共用同一个可点击 Style，整行点哪儿都算
+        Style copyStyle = Style.EMPTY
                 .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, code))
                 .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                        Component.literal("§7点击复制完整分享码"))));
+                        Component.literal("§7点击复制完整分享码（" + code.length() + " 字符）")));
+        Component clickable = Component.literal("§b§n[复制]§r ")
+                .withStyle(copyStyle)
+                .append(Component.literal("§b" + display).withStyle(copyStyle));
         source.sendSuccess(() -> clickable, false);
 
         if (code.length() > CHAT_SAFE_LENGTH) {
@@ -603,6 +613,8 @@ public final class OreGenCommand {
             source.sendSuccess(() -> Component.literal("§7（写入分享码文件失败，用上面的点击复制即可）"), false);
         }
 
+        source.sendSuccess(() -> Component.literal(
+                "§7自己要用也可以走 §e配置界面 → 预设方案 / 分享码 →「复制此码」§7，一键进剪贴板，不经过聊天栏。"), false);
         source.sendSuccess(() -> Component.literal(
                 "§7对方用法：粘进「配置界面 → 预设方案 / 分享码」的输入框点导入，"), false);
         source.sendSuccess(() -> Component.literal(
