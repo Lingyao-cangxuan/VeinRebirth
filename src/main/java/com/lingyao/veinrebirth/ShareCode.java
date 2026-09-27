@@ -18,6 +18,9 @@ import java.util.zip.Inflater;
 
 import com.mojang.logging.LogUtils;
 
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+
 import org.slf4j.Logger;
 
 /**
@@ -252,22 +255,47 @@ public final class ShareCode {
 
     // ================================================================== 导入
 
+    /**
+     * 分享码异常：带翻译键与参数，展示时才按玩家语言渲染。
+     * <p>
+     * 是 {@link IllegalArgumentException} 的子类，所以既有的 catch 分支不用改也不会漏。
+     */
+    public static class ShareException extends IllegalArgumentException {
+
+        private final String key;
+        private final Object[] args;
+
+        public ShareException(String key, Object... args) {
+            super(key);
+            this.key = key;
+            this.args = args;
+        }
+
+        /** 玩家可读的本地化文案。 */
+        public Component text() {
+            return Component.translatable(this.key, this.args);
+        }
+    }
+
     /** 导入结果统计。 */
     public record Result(int applied, int skipped, List<String> skippedIds, Boolean veins) {
 
-        /** 一句话摘要，命令与界面共用。 */
-        public String summary() {
-            StringBuilder sb = new StringBuilder("应用 ").append(this.applied).append(" 种矿物");
+        /** 一句话摘要，命令与界面共用（跟随玩家语言）。 */
+        public Component summary() {
+            MutableComponent sb = Component.translatable("veinrebirth.share.summary.applied", this.applied);
             if (this.skipped > 0) {
-                sb.append("，跳过 ").append(this.skipped).append(" 种本机未识别");
+                sb.append(Component.translatable("veinrebirth.share.summary.skipped", this.skipped));
                 if (this.skippedIds.size() <= 3) {
-                    sb.append("（").append(String.join("、", this.skippedIds)).append("）");
+                    sb.append(Component.translatable("veinrebirth.share.summary.skipped.ids",
+                            String.join(", ", this.skippedIds)));
                 }
             }
             if (this.veins != null) {
-                sb.append("；大型矿脉").append(this.veins ? "保留" : "清除");
+                sb.append(Component.translatable(this.veins
+                        ? "veinrebirth.share.summary.veins.keep"
+                        : "veinrebirth.share.summary.veins.clear"));
             }
-            return sb.toString();
+            return sb;
         }
     }
 
@@ -319,9 +347,9 @@ public final class ShareCode {
         }
 
         if (applied == 0) {
-            throw new IllegalArgumentException(skippedCount == 0
-                    ? "码里没有任何矿物数据"
-                    : "码里的矿物本机都没识别到（可能是别的整合包的矿物）");
+            throw new ShareException(skippedCount == 0
+                    ? "veinrebirth.share.summary.none"
+                    : "veinrebirth.share.summary.unknown");
         }
 
         pending.forEach(Runnable::run);
@@ -336,7 +364,7 @@ public final class ShareCode {
         // 先去掉颜色码/引号（保留换行），再去掉全部空白得到单行码
         String decorated = stripDecorations(code);
         if (decorated.isEmpty()) {
-            throw new IllegalArgumentException("分享码是空的");
+            throw new ShareException("veinrebirth.share.err.empty");
         }
         String compact = compact(decorated);
         String upper = compact.toUpperCase(Locale.ROOT);
@@ -354,7 +382,7 @@ public final class ShareCode {
         if (decorated.startsWith("veins=")) {
             return parseText(decorated);
         }
-        throw new IllegalArgumentException("这不是本模组的分享码（应以 " + PREFIX + "- 开头）");
+        throw new ShareException("veinrebirth.share.err.not_ours", PREFIX);
     }
 
     /** 解码 OGC2：校验 → Base64 →（可选）解压 → 解析二进制。 */
@@ -362,29 +390,29 @@ public final class ShareCode {
         // 载荷是 URL-safe Base64，本身就含 '-'，所以限制最多切两刀，余下的整段留给载荷
         String[] parts = code.split("-", 3);
         if (parts.length < 3 || parts[1].isEmpty() || parts[2].isEmpty()) {
-            throw new IllegalArgumentException("分享码不完整（缺少校验段或内容段）");
+            throw new ShareException("veinrebirth.share.err.incomplete");
         }
         long expected;
         try {
             expected = Long.parseLong(parts[1], 16);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("分享码的校验段损坏");
+            throw new ShareException("veinrebirth.share.err.bad_checksum");
         }
 
         byte[] payload;
         try {
             payload = Base64.getUrlDecoder().decode(parts[2]);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("分享码被截断了（Base64 段不完整）");
+            throw new ShareException("veinrebirth.share.err.truncated_base64");
         }
         if (payload.length < 5 || payload.length > MAX_PAYLOAD) {
-            throw new IllegalArgumentException("分享码内容异常");
+            throw new ShareException("veinrebirth.share.err.weird");
         }
 
         CRC32 crc = new CRC32();
         crc.update(payload);
         if (crc.getValue() != expected) {
-            throw new IllegalArgumentException("分享码校验失败，多半是复制时漏了字符");
+            throw new ShareException("veinrebirth.share.err.checksum_mismatch");
         }
 
         return parseBinary(unpack(payload));
@@ -398,7 +426,7 @@ public final class ShareCode {
         }
         byte[] plain = inflate(Arrays.copyOfRange(payload, 1, payload.length));
         if (plain.length == 0) {
-            throw new IllegalArgumentException("分享码内容为空或已损坏");
+            throw new ShareException("veinrebirth.share.err.empty_or_corrupt");
         }
         ByteArrayOutputStream out = new ByteArrayOutputStream(plain.length + 1);
         out.write(flags & ~FLAG_PACKED);
@@ -451,7 +479,7 @@ public final class ShareCode {
                         count, size, weight, minY, maxY, dimension));
             }
         } catch (IOException | RuntimeException e) {
-            throw new IllegalArgumentException("分享码内容已损坏");
+            throw new ShareException("veinrebirth.share.err.corrupt");
         }
         return new Decoded(entries, (flags & FLAG_VEINS) != 0);
     }
@@ -460,25 +488,25 @@ public final class ShareCode {
     private static Decoded decodeLegacy(String code) {
         String[] parts = code.split("-", 3);
         if (parts.length < 3 || parts[1].isEmpty() || parts[2].isEmpty()) {
-            throw new IllegalArgumentException("分享码不完整（缺少校验段或内容段）");
+            throw new ShareException("veinrebirth.share.err.incomplete");
         }
         long expected;
         try {
             expected = Long.parseLong(parts[1], 16);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("分享码的校验段损坏");
+            throw new ShareException("veinrebirth.share.err.bad_checksum");
         }
         byte[] packed;
         try {
             packed = Base64.getUrlDecoder().decode(parts[2]);
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("分享码被截断了（Base64 段不完整）");
+            throw new ShareException("veinrebirth.share.err.truncated_base64");
         }
         byte[] raw = inflate(packed);
         CRC32 crc = new CRC32();
         crc.update(raw);
         if (crc.getValue() != expected) {
-            throw new IllegalArgumentException("分享码校验失败，多半是复制时漏了字符");
+            throw new ShareException("veinrebirth.share.err.checksum_mismatch");
         }
         return parseText(new String(raw, StandardCharsets.UTF_8));
     }
@@ -541,16 +569,16 @@ public final class ShareCode {
                 }
                 out.write(buffer, 0, n);
                 if (out.size() > MAX_TEXT) {
-                    throw new IllegalArgumentException("分享码内容异常");
+                    throw new ShareException("veinrebirth.share.err.weird");
                 }
             }
         } catch (java.util.zip.DataFormatException e) {
-            throw new IllegalArgumentException("分享码内容已损坏");
+            throw new ShareException("veinrebirth.share.err.corrupt");
         } finally {
             inflater.end();
         }
         if (out.size() == 0) {
-            throw new IllegalArgumentException("分享码内容为空或已损坏");
+            throw new ShareException("veinrebirth.share.err.empty_or_corrupt");
         }
         return out.toByteArray();
     }
@@ -618,7 +646,7 @@ public final class ShareCode {
     public static String readFromFile() throws Exception {
         Path path = file();
         if (!Files.exists(path)) {
-            throw new IllegalArgumentException("没有找到 " + FILE_NAME + "，请先执行 /veinrebirth share");
+            throw new ShareException("veinrebirth.share.err.no_file", FILE_NAME);
         }
         return Files.readString(path, StandardCharsets.UTF_8);
     }

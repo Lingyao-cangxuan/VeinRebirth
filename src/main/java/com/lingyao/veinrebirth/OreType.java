@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
@@ -214,8 +215,38 @@ public final class OreType {
     }
 
     /**
-     * 显示名。原版用内置中文名；模组矿物取方块自身的名称（客户端会走模组的语言文件，
+     * 本地化显示名（跟随玩家语言，渲染时才解析）。
+     * <p>
+     * 原版 11 种走本模组自己的 {@code veinrebirth.ore.<id>}；自动识别到的模组矿物直接取
+     * <b>方块自身的名称组件</b> —— 于是「通用机械的锡矿石」「深板岩变体」这些名字会跟着
+     * 玩家语言自动变（原版与第三方模组的语言文件都在），本模组不需要维护任何矿物名单。
+     * 语言表拿不到时退回方块 id 的路径部分。
+     */
+    public Component name() {
+        if (this.fixedName != null) {
+            return Component.translatable("veinrebirth.ore." + this.id);
+        }
+        Block block = primaryBlock();
+        if (block != null) {
+            try {
+                Component name = block.getName();
+                String plain = name.getString();
+                if (plain != null && !plain.isEmpty() && !looksLikeTranslationKey(plain)) {
+                    return name;
+                }
+            } catch (Throwable ignored) {
+                // 语言表不可用时退回 id
+            }
+        }
+        return Component.literal(prettify(this.blockIds.isEmpty() ? this.id : this.blockIds.get(0)));
+    }
+
+    /**
+     * 纯文本显示名。原版用内置中文名；模组矿物取方块自身的名称（客户端会走模组的语言文件，
      * 服务端拿不到语言表时退回方块 id 的路径部分）。
+     * <p>
+     * 只用于「按关键词过滤」这类需要 String 的场合；界面与命令请用 {@link #name()}，
+     * 否则文本在构建那一刻就被固定成当时的语言了。
      */
     public String displayName() {
         if (this.fixedName != null) {

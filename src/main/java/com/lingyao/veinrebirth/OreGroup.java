@@ -2,6 +2,8 @@ package com.lingyao.veinrebirth;
 
 import java.util.Locale;
 
+import net.minecraft.network.chat.Component;
+
 /**
  * 矿物分组。
  * <p>
@@ -39,6 +41,11 @@ public enum OreGroup {
 
     public String id() {
         return this.id;
+    }
+
+    /** 本地化分组名（跟随玩家语言）。 */
+    public Component title() {
+        return Component.translatable("veinrebirth.group." + this.id);
     }
 
     /**

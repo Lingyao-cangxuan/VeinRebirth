@@ -3,6 +3,8 @@ package com.lingyao.veinrebirth;
 import java.util.List;
 import java.util.Locale;
 
+import net.minecraft.network.chat.Component;
+
 /**
  * 内置参数预设方案：一键把整套数值换成某种风格。
  * <p>
@@ -86,6 +88,16 @@ public enum Preset {
 
     public String description() {
         return this.description;
+    }
+
+    /** 本地化预设名（跟随玩家语言）。 */
+    public Component title() {
+        return Component.translatable("veinrebirth.preset." + this.id + ".name");
+    }
+
+    /** 本地化预设说明（跟随玩家语言）。 */
+    public Component desc() {
+        return Component.translatable("veinrebirth.preset." + this.id + ".desc");
     }
 
     public boolean veinOres() {

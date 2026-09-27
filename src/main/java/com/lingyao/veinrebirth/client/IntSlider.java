@@ -14,15 +14,15 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 @OnlyIn(Dist.CLIENT)
 public class IntSlider extends AbstractSliderButton {
 
-    private final String label;
+    private final Component label;
     private final int min;
     private final int max;
     private final IntConsumer onChange;
     private boolean ready;
 
-    public IntSlider(int x, int y, int width, int height, String label, int min, int max, int value,
+    public IntSlider(int x, int y, int width, int height, Component label, int min, int max, int value,
             IntConsumer onChange) {
-        super(x, y, width, height, Component.literal(label), toFraction(min, max, value));
+        super(x, y, width, height, label, toFraction(min, max, value));
         this.label = label;
         this.min = min;
         this.max = max;
@@ -46,7 +46,8 @@ public class IntSlider extends AbstractSliderButton {
         if (!this.ready) {
             return;
         }
-        this.setMessage(Component.literal(this.label + "：" + this.getIntValue()));
+        this.setMessage(Component.translatable("veinrebirth.gui.slider.format", this.label,
+                this.getIntValue()));
     }
 
     @Override
