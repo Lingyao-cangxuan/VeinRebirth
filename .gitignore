@@ -26,3 +26,6 @@ Thumbs.db
 *.bak
 *.tmp
 *.orig
+
+# 开发过程中的临时脚本与中间产物（不入库）
+.workbuddy/
