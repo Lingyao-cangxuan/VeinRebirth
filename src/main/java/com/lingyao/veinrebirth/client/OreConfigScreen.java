@@ -15,6 +15,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -75,7 +76,7 @@ public class OreConfigScreen extends Screen {
     private OreType selected;
 
     private boolean dirty;
-    private String status = "";
+    private Component status = Component.empty();
     private long statusTime;
 
     // ---------------- 布局（init 时算好） ----------------
@@ -104,10 +105,10 @@ public class OreConfigScreen extends Screen {
 
     /** 列表里的一行：要么是分组标题，要么是一种矿物。 */
     private static final class Row {
-        final String header;
+        final Component header;
         final OreType ore;
 
-        Row(String header) {
+        Row(Component header) {
             this.header = header;
             this.ore = null;
         }
@@ -119,7 +120,7 @@ public class OreConfigScreen extends Screen {
     }
 
     public OreConfigScreen(Screen parent) {
-        super(Component.literal("矿脉重生"));
+        super(Component.translatable("veinrebirth.gui.config.title"));
         this.parent = parent;
         this.selected = OreType.values()[0];
     }
@@ -177,9 +178,9 @@ public class OreConfigScreen extends Screen {
     private void initOreList() {
         // 搜索框：列表顶部，输入即时过滤
         this.searchBox = new EditBox(this.font, this.leftX + 3, this.topY + 16, this.listW - 6, SEARCH_H,
-                Component.literal("搜索矿物"));
+                Component.translatable("veinrebirth.gui.search"));
         this.searchBox.setMaxLength(48);
-        this.searchBox.setHint(Component.literal("搜索…"));
+        this.searchBox.setHint(Component.translatable("veinrebirth.gui.search.hint"));
         this.searchBox.setValue(this.filter);
         this.searchBox.setResponder(text -> {
             this.filter = text == null ? "" : text;
@@ -213,24 +214,24 @@ public class OreConfigScreen extends Screen {
 
         // 第 2~4 行：数量 / 规模 / 权重
         y += this.rowStep;
-        this.countSlider = this.addRenderableWidget(new IntSlider(sx, y, sw, this.rowH, "生成数量",
+        this.countSlider = this.addRenderableWidget(new IntSlider(sx, y, sw, this.rowH, Component.translatable("veinrebirth.gui.slider.count"),
                 OreType.COUNT_MIN, OreType.COUNT_MAX, settings.getCount(),
                 v -> this.change(s -> s.setCount(v))));
         y += this.rowStep;
-        this.sizeSlider = this.addRenderableWidget(new IntSlider(sx, y, sw, this.rowH, "生成规模",
+        this.sizeSlider = this.addRenderableWidget(new IntSlider(sx, y, sw, this.rowH, Component.translatable("veinrebirth.gui.slider.size"),
                 OreType.SIZE_MIN, OreType.SIZE_MAX, settings.getSize(),
                 v -> this.change(s -> s.setSize(v))));
         y += this.rowStep;
-        this.weightSlider = this.addRenderableWidget(new IntSlider(sx, y, sw, this.rowH, "生成权重(%)",
+        this.weightSlider = this.addRenderableWidget(new IntSlider(sx, y, sw, this.rowH, Component.translatable("veinrebirth.gui.slider.weight"),
                 OreType.WEIGHT_MIN, OreType.WEIGHT_MAX, settings.getWeight(),
                 v -> this.change(s -> s.setWeight(v))));
 
         // 第 5 行：最低高度 | 最高高度（并排，省一行高度）
         y += this.rowStep;
-        this.minYSlider = this.addRenderableWidget(new IntSlider(sx, y, half, this.rowH, "最低高度",
+        this.minYSlider = this.addRenderableWidget(new IntSlider(sx, y, half, this.rowH, Component.translatable("veinrebirth.gui.slider.min_y"),
                 OreType.Y_MIN, OreType.Y_MAX, settings.getMinY(),
                 v -> this.change(s -> s.setMinY(v))));
-        this.maxYSlider = this.addRenderableWidget(new IntSlider(sx + half + 6, y, half, this.rowH, "最高高度",
+        this.maxYSlider = this.addRenderableWidget(new IntSlider(sx + half + 6, y, half, this.rowH, Component.translatable("veinrebirth.gui.slider.max_y"),
                 OreType.Y_MIN, OreType.Y_MAX, settings.getMaxY(),
                 v -> this.change(s -> s.setMaxY(v))));
 
@@ -245,21 +246,21 @@ public class OreConfigScreen extends Screen {
         // 第 7 行：保存 / 重载 / 默认
         y += this.rowStep;
         int buttonW = (sw - 8) / 3;
-        this.addRenderableWidget(Button.builder(Component.literal("保存配置"), b -> this.applyAndSave())
+        this.addRenderableWidget(Button.builder(Component.translatable("veinrebirth.gui.button.save"), b -> this.applyAndSave())
                 .bounds(sx, y, buttonW, this.rowH).build());
-        this.addRenderableWidget(Button.builder(Component.literal("重新载入"), b -> this.reloadFromFile())
+        this.addRenderableWidget(Button.builder(Component.translatable("veinrebirth.gui.button.reload"), b -> this.reloadFromFile())
                 .bounds(sx + buttonW + 4, y, buttonW, this.rowH).build());
-        this.addRenderableWidget(Button.builder(Component.literal("恢复默认"), b -> this.restoreDefaults())
+        this.addRenderableWidget(Button.builder(Component.translatable("veinrebirth.gui.button.restore"), b -> this.restoreDefaults())
                 .bounds(sx + (buttonW + 4) * 2, y, buttonW, this.rowH).build());
 
         // 第 8 行：预设方案与分享码
         y += this.rowStep;
-        this.addRenderableWidget(Button.builder(Component.literal("预设方案 / 分享码…"),
+        this.addRenderableWidget(Button.builder(Component.translatable("veinrebirth.gui.button.presets"),
                 b -> this.openPresets()).bounds(sx, y, sw, this.rowH).build());
 
         // 底部「完成」
         this.doneY = this.topY + this.panelH + 6;
-        this.addRenderableWidget(Button.builder(Component.literal("完成"), b -> this.onClose())
+        this.addRenderableWidget(Button.builder(Component.translatable("veinrebirth.gui.button.done"), b -> this.onClose())
                 .bounds(this.width / 2 - 60, this.doneY, 120, 20).build());
     }
 
@@ -272,7 +273,8 @@ public class OreConfigScreen extends Screen {
         if (!keyword.isEmpty()) {
             for (OreType type : OreType.values()) {
                 if (type.id().toLowerCase(Locale.ROOT).contains(keyword)
-                        || type.displayName().toLowerCase(Locale.ROOT).contains(keyword)) {
+                        || type.displayName().toLowerCase(Locale.ROOT).contains(keyword)
+                        || type.name().getString().toLowerCase(Locale.ROOT).contains(keyword)) {
                     this.rows.add(new Row(type));
                 }
             }
@@ -288,7 +290,7 @@ public class OreConfigScreen extends Screen {
                 continue;
             }
             if (!headerAdded) {
-                this.rows.add(new Row("原版矿物"));
+                this.rows.add(new Row(Component.translatable("veinrebirth.gui.group.vanilla")));
                 headerAdded = true;
             }
             this.rows.add(new Row(type));
@@ -302,7 +304,8 @@ public class OreConfigScreen extends Screen {
             }
             if (!type.namespace().equals(lastNamespace)) {
                 lastNamespace = type.namespace();
-                this.rows.add(new Row("模组 · " + namespaceLabel(lastNamespace)));
+                this.rows.add(new Row(Component.translatable("veinrebirth.gui.group.modded",
+                        namespaceLabel(lastNamespace))));
             }
             this.rows.add(new Row(type));
         }
@@ -376,14 +379,14 @@ public class OreConfigScreen extends Screen {
 
     private void markDirty() {
         this.dirty = true;
-        this.status = "";
+        this.status = Component.empty();
     }
 
     private void applyAndSave() {
         ConfigManager.save();
         this.pushToServerIfNeeded();
         this.dirty = false;
-        this.setStatus("§a已保存到 config/" + ConfigManager.FILE_NAME);
+        this.setStatus(Component.translatable("veinrebirth.gui.status.saved", ConfigManager.FILE_NAME));
     }
 
     private void reloadFromFile() {
@@ -391,7 +394,7 @@ public class OreConfigScreen extends Screen {
         this.syncWidgetsFromConfig();
         rebuildRows();
         this.dirty = false;
-        this.setStatus("§a已重新读取配置文件");
+        this.setStatus(Component.translatable("veinrebirth.gui.status.reloaded"));
     }
 
     private void restoreDefaults() {
@@ -402,9 +405,9 @@ public class OreConfigScreen extends Screen {
         // 恢复默认会关掉所有模组矿物的接管，但它们先前生成的方块还留在世界里。
         // 接管历史会保住这些方块的清理依据，这里把用法直接告诉玩家。
         if (ConfigManager.everHandled().isEmpty()) {
-            this.setStatus("§e已恢复默认值（尚未保存）");
+            this.setStatus(Component.translatable("veinrebirth.gui.status.restored"));
         } else {
-            this.setStatus("§e已恢复默认；先前的模组矿物残留请用 /veinrebirth refresh <半径> clean 清除");
+            this.setStatus(Component.translatable("veinrebirth.gui.status.restored_modded"));
         }
     }
 
@@ -415,7 +418,7 @@ public class OreConfigScreen extends Screen {
     private void hintAfterToggle(OreSettings settings) {
         if (this.selected != null && this.selected.modded() && !settings.isEnabled()
                 && ConfigManager.everHandled().contains(this.selected.id())) {
-            this.setStatus("§7已取消接管；世界里先前生成的方块可用 /veinrebirth refresh <半径> clean 清除");
+            this.setStatus(Component.translatable("veinrebirth.gui.status.unmanaged"));
         }
     }
 
@@ -437,7 +440,7 @@ public class OreConfigScreen extends Screen {
         }
     }
 
-    private void setStatus(String text) {
+    private void setStatus(Component text) {
         this.status = text;
         this.statusTime = System.currentTimeMillis();
     }
@@ -457,19 +460,18 @@ public class OreConfigScreen extends Screen {
         boolean on = ConfigManager.get(this.selected).isEnabled();
         // 文案按最窄情况（320×240 时按钮宽约 156px）压过：中文按 9px 估算，
         // 两种都控制在 ~130px 以内，避免原版按钮不做裁剪导致文字溢到相邻控件上。
-        String label;
-        if (this.selected.modded()) {
-            label = on ? "§f接管生成：§a已接管§8（点击切换）" : "§f接管生成：§c未接管§8（点击切换）";
-        } else {
-            label = on ? "§f生成开关：§a已启用§8（点击切换）" : "§f生成开关：§c已禁用§8（点击切换）";
-        }
-        this.toggleButton.setMessage(Component.literal(label));
+        String key = this.selected.modded()
+                ? (on ? "veinrebirth.gui.toggle.modded.on" : "veinrebirth.gui.toggle.modded.off")
+                : (on ? "veinrebirth.gui.toggle.enabled.on" : "veinrebirth.gui.toggle.enabled.off");
+        this.toggleButton.setMessage(Component.translatable(key));
     }
 
     private void updateVeinLabel() {
         boolean on = ConfigManager.isVeinOresEnabled();
-        this.veinButton.setMessage(Component.literal(
-                "§f原版大型矿脉：" + (on ? "§a保留" : "§c已清除") + "§8（点击）"));
+        this.veinButton.setMessage(Component.translatable("veinrebirth.gui.veins",
+                Component.translatable(on
+                        ? "veinrebirth.gui.veins.on"
+                        : "veinrebirth.gui.veins.off")));
     }
 
     @Override
@@ -573,22 +575,24 @@ public class OreConfigScreen extends Screen {
 
         // 底部提示：有状态消息时优先显示状态
         graphics.drawCenteredString(this.font,
-                "§7配置文件：config/" + ConfigManager.FILE_NAME + "（可用记事本编辑）",
+                Component.translatable("veinrebirth.gui.hint.config_file", ConfigManager.FILE_NAME),
                 this.width / 2, this.doneY + 24, COLOR_HINT);
-        if (!this.status.isEmpty() && System.currentTimeMillis() - this.statusTime < 5000L) {
+        if (!this.status.getString().isEmpty() && System.currentTimeMillis() - this.statusTime < 5000L) {
             graphics.drawCenteredString(this.font, this.status, this.width / 2, this.doneY + 36, 0xFFFFFF);
         } else if (this.doneY + 45 <= this.height) {
             graphics.drawCenteredString(this.font,
-                    "§7新生成的区块立即生效；旧区块用 §f/veinrebirth refresh <半径>§7 刷新",
+                    Component.translatable("veinrebirth.gui.hint.instant"),
                     this.width / 2, this.doneY + 36, COLOR_HINT);
         }
 
         // 悬停提示放在最后，避免被其它元素盖住
         if (this.hoveredOre != null) {
-            graphics.renderTooltip(this.font,
-                    Component.literal(this.hoveredOre.blockId() + "  §7" + this.hoveredOre.group().displayName()
-                            + (this.hoveredOre.modded() ? "  §7识别自模组" : "")),
-                    mouseX, mouseY);
+            MutableComponent tip = Component.literal(this.hoveredOre.blockId() + "  §7")
+                    .append(this.hoveredOre.group().title());
+            if (this.hoveredOre.modded()) {
+                tip.append(Component.translatable("veinrebirth.gui.hint.modded"));
+            }
+            graphics.renderTooltip(this.font, tip, mouseX, mouseY);
         }
     }
 
@@ -598,15 +602,16 @@ public class OreConfigScreen extends Screen {
         graphics.drawCenteredString(this.font, this.title, this.width / 2, titleY, COLOR_TITLE);
 
         // 左侧：列表标题 + 计数
-        graphics.drawString(this.font, "矿物列表", this.leftX + 4, this.topY + 5, COLOR_TITLE, false);
-        String count = "§7" + this.rows.size() + " 项";
+        graphics.drawString(this.font, Component.translatable("veinrebirth.gui.list.title"),
+                this.leftX + 4, this.topY + 5, COLOR_TITLE, false);
+        Component count = Component.translatable("veinrebirth.gui.list.count", this.rows.size());
         graphics.drawString(this.font, count,
                 this.leftX + this.listW - 5 - this.font.width(count), this.topY + 5, COLOR_HINT, false);
 
         // 右侧：当前矿物。名称可能很长（模组矿物的译名），用 scissor 限制在面板标题条内，
         // 避免原版 drawString 不做裁剪、文字直接溢到面板外面去。
         OreType ore = this.selected;
-        String name = "§f设置：§e" + ore.displayName();
+        Component name = Component.translatable("veinrebirth.gui.panel.title", ore.name());
         graphics.enableScissor(this.rightX + 1, this.topY, this.rightX + this.rightW - 1, this.topY + 15);
         try {
             graphics.drawString(this.font, name, this.rightX + 4, this.topY + 5, COLOR_TITLE, false);
@@ -620,8 +625,8 @@ public class OreConfigScreen extends Screen {
         }
 
         if (this.dirty) {
-            String text = "* 有未保存的修改";
-            graphics.drawString(this.font, "§6" + text,
+            Component text = Component.translatable("veinrebirth.gui.dirty");
+            graphics.drawString(this.font, Component.literal("§6").append(text),
                     this.width - 4 - this.font.width(text), titleY, COLOR_DIRTY, false);
         }
     }
@@ -665,7 +670,7 @@ public class OreConfigScreen extends Screen {
                 graphics.fill(this.leftX + 2, y + 2, this.leftX + 4, y + ROW_H - 2, dot);
 
                 int color = selectedRow ? 0xFFFFFFFF : (on ? COLOR_TEXT_ON : COLOR_TEXT_OFF);
-                String label = ore.displayName();
+                Component label = ore.name();
                 int textX = this.leftX + 7;
                 graphics.drawString(this.font, label, textX, y + 2, color, false);
 

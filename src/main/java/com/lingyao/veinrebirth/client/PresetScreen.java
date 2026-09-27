@@ -11,11 +11,13 @@ import com.lingyao.veinrebirth.NetworkHandler;
 import com.lingyao.veinrebirth.Preset;
 import com.lingyao.veinrebirth.ShareCode;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -51,7 +53,7 @@ public class PresetScreen extends Screen {
     private final Map<Button, Preset> presetButtons = new LinkedHashMap<>();
     private final List<Button> presetOrder = new ArrayList<>();
 
-    private String status = "";
+    private Component status = Component.empty();
     private long statusTime;
     private Preset hoveredPreset;
 
@@ -68,7 +70,7 @@ public class PresetScreen extends Screen {
     private int bottomY;
 
     public PresetScreen(Screen parent) {
-        super(Component.literal("预设方案与分享码"));
+        super(Component.translatable("veinrebirth.gui.preset.title"));
         this.parent = parent;
     }
 
@@ -112,7 +114,8 @@ public class PresetScreen extends Screen {
 
         // 底部「返回」
         this.bottomY = this.panelY + this.panelH + 6;
-        this.addRenderableWidget(Button.builder(Component.literal("返回"), b -> this.onClose())
+        this.addRenderableWidget(Button.builder(Component.translatable("veinrebirth.gui.button.back"),
+                b -> this.onClose())
                 .bounds(this.width / 2 - 50, this.bottomY, 100, 20).build());
     }
 
@@ -135,7 +138,7 @@ public class PresetScreen extends Screen {
             int y = startY + row * this.rowStep;
 
             Button button = this.addRenderableWidget(Button.builder(
-                    Component.literal(preset.displayName()), b -> this.applyPreset(preset))
+                    preset.title(), b -> this.applyPreset(preset))
                     .bounds(x, y, w, this.rowH).build());
             this.presetButtons.put(button, preset);
             this.presetOrder.add(button);
@@ -147,18 +150,18 @@ public class PresetScreen extends Screen {
         // 输入框只用来「粘贴别人的码」，所以留空并给提示 ——
         // 自己的码点一下「复制此码」就进剪贴板了，不需要用户自己去框里选中复制
         this.codeBox = new EditBox(this.font, this.panelX + 4, boxY, this.panelW - 8, codeBoxH,
-                Component.literal("分享码"));
+                Component.translatable("veinrebirth.gui.share.label"));
         this.codeBox.setMaxLength(8192);
-        this.codeBox.setHint(Component.literal("在此粘贴别人的分享码，然后点「导入此码」…"));
+        this.codeBox.setHint(Component.translatable("veinrebirth.gui.share.hint"));
         this.addRenderableWidget(this.codeBox);
 
         int buttonY = boxY + codeBoxH + gapB;
         int btnW = (this.panelW - 16) / 3;
-        this.addRenderableWidget(Button.builder(Component.literal("复制此码"), b -> this.copyCode())
+        this.addRenderableWidget(Button.builder(Component.translatable("veinrebirth.gui.button.copy"), b -> this.copyCode())
                 .bounds(this.panelX + 4, buttonY, btnW, this.rowH).build());
-        this.addRenderableWidget(Button.builder(Component.literal("导入此码"), b -> this.importCode())
+        this.addRenderableWidget(Button.builder(Component.translatable("veinrebirth.gui.button.import"), b -> this.importCode())
                 .bounds(this.panelX + 8 + btnW, buttonY, btnW, this.rowH).build());
-        this.addRenderableWidget(Button.builder(Component.literal("清空输入框"), b -> this.clearInput())
+        this.addRenderableWidget(Button.builder(Component.translatable("veinrebirth.gui.button.clear"), b -> this.clearInput())
                 .bounds(this.panelX + 12 + btnW * 2, buttonY, btnW, this.rowH).build());
 
         refreshCodeLength();
@@ -170,7 +173,7 @@ public class PresetScreen extends Screen {
         Preset.apply(preset);
         this.saveAndSync();
         refreshCodeLength();
-        this.setStatus("§a已套用预设：" + preset.displayName());
+        this.setStatus(Component.translatable("veinrebirth.gui.preset.status.applied", preset.title()));
     }
 
     private void copyCode() {
@@ -180,13 +183,14 @@ public class PresetScreen extends Screen {
         String code = ShareCode.encode();
         this.minecraft.keyboardHandler.setClipboard(code);
         this.codeLength = code.length();
-        this.setStatus("§a分享码已复制到剪贴板（" + code.length() + " 字符），直接发给别人即可");
+        this.setStatus(Component.translatable("veinrebirth.gui.share.status.copied",
+                code.length()));
     }
 
     private void importCode() {
         String raw = this.codeBox.getValue();
         if (raw == null || raw.isBlank()) {
-            this.setStatus("§c请先把分享码粘贴到上面的输入框里");
+            this.setStatus(Component.translatable("veinrebirth.gui.share.status.empty"));
             return;
         }
         try {
@@ -194,17 +198,19 @@ public class PresetScreen extends Screen {
             this.saveAndSync();
             this.codeBox.setValue("");
             refreshCodeLength();
-            this.setStatus("§a导入成功：" + result.summary());
+            this.setStatus(Component.translatable("veinrebirth.gui.share.status.imported",
+                    result.summary()));
         } catch (IllegalArgumentException e) {
-            this.setStatus("§c导入失败：" + e.getMessage());
+            this.setStatus(Component.translatable("veinrebirth.gui.share.status.failed", reasonOf(e)));
         } catch (Exception e) {
-            this.setStatus("§c导入失败：" + e.getClass().getSimpleName());
+            this.setStatus(Component.translatable("veinrebirth.gui.share.status.failed",
+                    e.getClass().getSimpleName()));
         }
     }
 
     private void clearInput() {
         this.codeBox.setValue("");
-        this.setStatus("§7已清空输入框");
+        this.setStatus(Component.translatable("veinrebirth.gui.share.status.cleared"));
     }
 
     /** 重新算一遍当前配置的码长（面板标题要显示）。编码本身很便宜，但也没必要每帧算。 */
@@ -223,7 +229,7 @@ public class PresetScreen extends Screen {
         }
     }
 
-    private void setStatus(String text) {
+    private void setStatus(Component text) {
         this.status = text;
         this.statusTime = System.currentTimeMillis();
     }
@@ -240,12 +246,14 @@ public class PresetScreen extends Screen {
                 Math.max(4, this.panelY - 12), COLOR_TITLE);
 
         // 面板标题 + 预设区标题
-        graphics.drawString(this.font, "预设方案", this.panelX + 4, this.panelY + 4, COLOR_TITLE, false);
+        graphics.drawString(this.font, Component.translatable("veinrebirth.gui.preset.panel"),
+                this.panelX + 4, this.panelY + 4, COLOR_TITLE, false);
 
         // 分享码区标题（右侧显示当前配置的码长，让玩家知道复制出来的有多长）
         int labelY = this.panelY + 14 + PRESET_ROWS * this.rowStep + 12;
-        graphics.drawString(this.font, "分享码", this.panelX + 4, labelY, COLOR_HEADER, false);
-        String codeHint = "§8当前配置共 " + this.codeLength + " 字符";
+        graphics.drawString(this.font, Component.translatable("veinrebirth.gui.share.label"),
+                this.panelX + 4, labelY, COLOR_HEADER, false);
+        Component codeHint = Component.translatable("veinrebirth.gui.share.length", this.codeLength);
         graphics.drawString(this.font, codeHint,
                 this.panelX + this.panelW - 5 - this.font.width(codeHint),
                 labelY, COLOR_HINT, false);
@@ -254,10 +262,11 @@ public class PresetScreen extends Screen {
 
         // 状态提示（窄屏下 320×240 只剩约 22px，所以折行结果要按可用高度截断）
         int statusY = this.bottomY + 22;
-        if (!this.status.isEmpty() && System.currentTimeMillis() - this.statusTime < 6000L) {
+        if (!this.status.getString().isEmpty() && System.currentTimeMillis() - this.statusTime < 6000L) {
             drawWrapped(graphics, this.status, this.width / 2, statusY);
         } else {
-            graphics.drawCenteredString(this.font, "§7预设以出厂值为基准，反复点同一个结果一致",
+            graphics.drawCenteredString(this.font,
+                    Component.translatable("veinrebirth.gui.preset.note"),
                     this.width / 2, statusY, COLOR_HINT);
         }
 
@@ -270,25 +279,40 @@ public class PresetScreen extends Screen {
             }
         }
         if (this.hoveredPreset != null) {
-            // 必须放进多个 Component 再交给 tooltip：单条文本里的 '\n' 走的是"单行"渲染路径，
+            // 必须拆成多行再交给 tooltip：单条文本里的 '\n' 走的是"单行"渲染路径，
             // 会被当成普通字符画成一个缺失字形的空心方块（看着就像按钮上多了个小图标）。
-            List<Component> lines = new ArrayList<>();
-            lines.add(Component.literal("§e" + this.hoveredPreset.displayName()));
-            for (String line : wrap(this.hoveredPreset.description(), 24).split("\n")) {
-                if (!line.isEmpty()) {
-                    lines.add(Component.literal("§7" + line));
-                }
-            }
-            graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+            // 折行按像素宽度算（font.split），中英文都能贴住面板边缘，不会溢出。
+            List<FormattedCharSequence> lines = new ArrayList<>();
+            lines.add(this.hoveredPreset.title().copy().withStyle(ChatFormatting.YELLOW).getVisualOrderText());
+            lines.addAll(this.font.split(
+                    this.hoveredPreset.desc().copy().withStyle(ChatFormatting.GRAY), Math.max(80, this.panelW - 24)));
+            graphics.renderTooltip(this.font, lines, mouseX, mouseY);
         }
     }
 
-    /** 状态文字可能很长，按宽度折行居中显示，并限制在屏幕内。 */
-    private void drawWrapped(GuiGraphics graphics, String text, int centerX, int y) {
-        String[] lines = wrap(text, 46).split("\n");
-        for (int i = 0; i < lines.length && y + i * 11 <= this.height - 10; i++) {
-            graphics.drawCenteredString(this.font, lines[i], centerX, y + i * 11, 0xFFFFFF);
+    /** 状态文字可能很长，按像素宽度折行居中显示，并限制在屏幕内。 */
+    private void drawWrapped(GuiGraphics graphics, Component text, int centerX, int y) {
+        int lineY = y;
+        for (FormattedCharSequence line : this.font.split(text, Math.max(80, this.width - 20))) {
+            if (lineY > this.height - 10) {
+                break;
+            }
+            graphics.drawString(this.font, line, centerX - this.font.width(line) / 2, lineY, 0xFFFFFF, false);
+            lineY += 11;
         }
+    }
+
+    /**
+     * 分享码异常 → 玩家可读文案。
+     * <p>
+     * {@link ShareCode.ShareException} 自带翻译键，按玩家语言渲染；其它异常只能拿到原始消息，原样显示。
+     */
+    private static Component reasonOf(IllegalArgumentException e) {
+        if (e instanceof ShareCode.ShareException share) {
+            return share.text();
+        }
+        String message = e.getMessage();
+        return Component.literal(message == null ? e.getClass().getSimpleName() : message);
     }
 
     /** 纯文本按字数粗略折行（中文按等宽估算，够用）。 */

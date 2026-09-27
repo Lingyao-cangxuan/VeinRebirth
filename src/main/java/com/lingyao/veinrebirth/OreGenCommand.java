@@ -20,6 +20,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.server.level.ServerLevel;
@@ -234,11 +235,11 @@ public final class OreGenCommand {
         int failed = fail;
         VeinRebirthMod.LOGGER.info("[VeinRebirth] SELFTEST total={} pass={} fail={}", total, passed, failed);
         if (failed == 0) {
-            source.sendSuccess(() -> Component.literal(
-                    "§a[矿脉重生] §f自检通过：§a" + passed + "§f/" + total + " 项"), false);
+            source.sendSuccess(() -> Component.translatable(
+                    "veinrebirth.cmd.selftest.pass", passed, total), false);
         } else {
-            source.sendFailure(Component.literal(
-                    "§c[矿脉重生] 自检失败 §c" + failed + "§f/" + total + " 项，详见日志"));
+            source.sendFailure(Component.translatable(
+                    "veinrebirth.cmd.selftest.fail", failed, total));
         }
         return failed == 0 ? 1 : 0;
     }
@@ -265,47 +266,45 @@ public final class OreGenCommand {
             level = source.getServer().overworld();
         }
         if (level == null) {
-            source.sendFailure(Component.literal("§c[矿脉重生] 无法确定要刷新的维度。"));
+            source.sendFailure(Component.translatable("veinrebirth.cmd.refresh.no_dimension"));
             return 0;
         }
         final ServerLevel targetLevel = level;
         BlockPos center = BlockPos.containing(source.getPosition());
 
-        String modeText = switch (mode) {
-            case NONE -> "";
-            case MANAGED -> "（先清除本模组生成过的矿物）";
-            case ALL -> "（先清除范围内所有矿石方块，含未接管的模组矿石）";
+        Component modeText = switch (mode) {
+            case NONE -> Component.empty();
+            case MANAGED -> Component.translatable("veinrebirth.cmd.refresh.mode.managed");
+            case ALL -> Component.translatable("veinrebirth.cmd.refresh.mode.all");
         };
-        source.sendSuccess(() -> Component.literal("§e[矿脉重生] §f正在刷新 §e" + targetLevel.dimension().location()
-                + " §f中半径 " + radius + " 区块内的矿物" + modeText + "……"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.refresh.start",
+                targetLevel.dimension().location().toString(), radius, modeText), false);
 
         ChunkRefresher.Result result;
         try {
             result = ChunkRefresher.refresh(level, center, radius, mode);
         } catch (Throwable t) {
             VeinRebirthMod.LOGGER.error("[VeinRebirth] Refresh failed", t);
-            String message = t.getClass().getSimpleName() + (t.getMessage() == null ? "" : "：" + t.getMessage());
-            source.sendFailure(Component.literal("§c[矿脉重生] 刷新失败：" + message));
+            String message = t.getClass().getSimpleName() + (t.getMessage() == null ? "" : ": " + t.getMessage());
+            source.sendFailure(Component.translatable("veinrebirth.cmd.refresh.failed", message));
             return 0;
         }
 
         ChunkRefresher.Result finalResult = result;
-        source.sendSuccess(() -> Component.literal("§a[矿脉重生] §f完成：共扫描 §e" + finalResult.chunksScanned()
-                + " §f个区块，其中 §e" + finalResult.chunksTouched() + " §f个区块生成了新矿物。"), true);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.refresh.done",
+                finalResult.chunksScanned(), finalResult.chunksTouched()), true);
         if (finalResult.oreBlocksRemoved() > 0) {
-            source.sendSuccess(() -> Component.literal("§a[矿脉重生] §f清除了 §e"
-                    + finalResult.oreBlocksRemoved() + " §f个已生成的矿石方块。"), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.refresh.removed",
+                    finalResult.oreBlocksRemoved()), false);
         }
         if (finalResult.veinBlocksRemoved() > 0) {
-            source.sendSuccess(() -> Component.literal("§a[矿脉重生] §f另清除了 §e"
-                    + finalResult.veinBlocksRemoved() + " §f个原版大型矿脉方块。"), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.refresh.veins_removed",
+                    finalResult.veinBlocksRemoved()), false);
         }
         if (mode == ChunkRefresher.CleanMode.ALL) {
-            source.sendSuccess(() -> Component.literal(
-                    "§7提示：clean all 连未被本模组接管的模组矿石也清掉了，这些方块不会被本模组重建。"
-                            + "只想清本模组留下的残留，请用 §e/veinrebirth refresh <半径> clean"), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.refresh.clean_all_hint"), false);
         }
-        source.sendSuccess(() -> Component.literal("§7提示：本命令只对已生成的区块补加 / 重建矿物，不会重新生成地形。"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.refresh.hint"), false);
         return finalResult.chunksTouched();
     }
 
@@ -317,13 +316,15 @@ public final class OreGenCommand {
 
         OreType[] all = OreType.values();
         int matched = 0;
-        source.sendSuccess(() -> Component.literal("§6===== §e矿物清单 §7(共 " + all.length + " 种，其中自动识别 "
-                + OreType.moddedCount() + " 种) §6====="), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.list.header",
+                all.length, OreType.moddedCount()), false);
 
         for (OreType type : all) {
+            // 关键字同时匹配 id、中文名与当前语言下的名字（英文环境下输入 "tin" 也要能搜到锡矿）
             if (!keyword.isEmpty()
                     && !type.id().toLowerCase(Locale.ROOT).contains(keyword)
-                    && !type.displayName().toLowerCase(Locale.ROOT).contains(keyword)) {
+                    && !type.displayName().toLowerCase(Locale.ROOT).contains(keyword)
+                    && !type.name().getString().toLowerCase(Locale.ROOT).contains(keyword)) {
                 continue;
             }
             matched++;
@@ -331,49 +332,53 @@ public final class OreGenCommand {
                 continue;
             }
             OreSettings settings = ConfigManager.get(type);
-            String mark = type.modded() ? (settings.isEnabled() ? "§b[接管]§r " : "§8[未接管]§r ") : "";
-            String line = "§f" + mark + type.displayName() + " §7(" + type.id() + ") §8"
-                    + type.group().displayName()
-                    + (settings.willGenerate() ? "" : " §8·未生成");
-            source.sendSuccess(() -> Component.literal(line), false);
+            Component mark = type.modded()
+                    ? Component.translatable(settings.isEnabled()
+                            ? "veinrebirth.cmd.list.mark.managed"
+                            : "veinrebirth.cmd.list.mark.unmanaged")
+                    : Component.empty();
+            MutableComponent line = Component.literal("§f").append(mark).append(type.name())
+                    .append(Component.literal(" §7(" + type.id() + ") §8"))
+                    .append(type.group().title());
+            if (!settings.willGenerate()) {
+                line.append(Component.translatable("veinrebirth.cmd.list.not_generating"));
+            }
+            source.sendSuccess(() -> line, false);
         }
 
         if (matched == 0) {
-            source.sendSuccess(() -> Component.literal("§7没有匹配「" + keyword + "」的矿物。"), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.list.empty", keyword), false);
             return 0;
         }
         if (matched > LIST_LIMIT) {
             int rest = matched - LIST_LIMIT;
-            source.sendSuccess(() -> Component.literal("§7……还有 " + rest + " 种未显示，可用 §e/veinrebirth list <关键字>§7 过滤，"
-                    + "或在游戏内配置界面用搜索框浏览。"), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.list.truncated", rest), false);
         }
         return matched;
     }
 
     private static int scan(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack source = ctx.getSource();
-        source.sendSuccess(() -> Component.literal("§e[矿脉重生] §f正在扫描方块注册表与标签，识别其它模组的矿物……"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.scan.start"), false);
         int added;
         try {
             added = OreDiscoverer.rescan();
         } catch (Throwable t) {
             VeinRebirthMod.LOGGER.error("[VeinRebirth] Rescan failed", t);
-            String message = t.getClass().getSimpleName() + (t.getMessage() == null ? "" : "：" + t.getMessage());
-            source.sendFailure(Component.literal("§c[矿脉重生] 扫描失败：" + message));
+            String message = t.getClass().getSimpleName() + (t.getMessage() == null ? "" : ": " + t.getMessage());
+            source.sendFailure(Component.translatable("veinrebirth.cmd.scan.failed", message));
             return 0;
         }
         int total = OreType.moddedCount();
         if (added > 0) {
-            source.sendSuccess(() -> Component.literal("§a[矿脉重生] §f新识别到 §e" + added
-                    + " §f种模组矿物，累计 §e" + total + " §f种。已写入配置文件，默认不接管。"), true);
-            source.sendSuccess(() -> Component.literal(
-                    "§7提示：在配置界面里把要接管的矿物打开，或执行 §e/veinrebirth list §7查看清单。"), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.scan.added",
+                    added, total), true);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.scan.added_hint"), false);
         } else {
-            source.sendSuccess(() -> Component.literal("§a[矿脉重生] §f没有新发现，当前累计识别到 §e" + total + " §f种模组矿物。"), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.scan.none", total), false);
         }
         if (!ConfigManager.isDetectModdedOres()) {
-            source.sendSuccess(() -> Component.literal(
-                    "§7注意：配置文件里 detect_modded_ores = false，识别功能已关闭，本次扫描未生效。"), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.scan.disabled"), false);
         }
         return added;
     }
@@ -383,14 +388,16 @@ public final class OreGenCommand {
     private static int reload(CommandContext<CommandSourceStack> ctx) {
         ConfigManager.load();
         ConfigManager.syncToAll();
-        ctx.getSource().sendSuccess(() -> Component.literal("§a[矿脉重生] §f已重新读取配置文件：§7" + ConfigManager.file()), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("veinrebirth.cmd.reload.done",
+                ConfigManager.file().toString()), true);
         return 1;
     }
 
     private static int save(CommandContext<CommandSourceStack> ctx) {
         ConfigManager.save();
         ConfigManager.syncToAll();
-        ctx.getSource().sendSuccess(() -> Component.literal("§a[矿脉重生] §f已保存到：§7" + ConfigManager.file()), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("veinrebirth.cmd.save.done",
+                ConfigManager.file().toString()), true);
         return 1;
     }
 
@@ -398,7 +405,7 @@ public final class OreGenCommand {
         ConfigManager.resetToDefaults();
         ConfigManager.save();
         ConfigManager.syncToAll();
-        ctx.getSource().sendSuccess(() -> Component.literal("§a[矿脉重生] §f所有矿物已恢复原版默认数值并保存。"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("veinrebirth.cmd.defaults.done"), true);
         return 1;
     }
 
@@ -407,12 +414,16 @@ public final class OreGenCommand {
     private static int veinsInfo(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack source = ctx.getSource();
         boolean on = ConfigManager.isVeinOresEnabled();
-        source.sendSuccess(() -> Component.literal("§6===== §e原版大型矿脉 §6====="), false);
-        source.sendSuccess(() -> Component.literal("§f    状态 = " + (on ? "§a已启用（保留原版矿脉）" : "§c已禁用（清除矿脉）")), false);
-        source.sendSuccess(() -> Component.literal("§7    说明：1.18+ 的铜矿脉 / 铁矿脉，由地形噪声直接生成，"), false);
-        source.sendSuccess(() -> Component.literal("§7          不经过数据包，所以无法用 biome_modifier 移除。"), false);
-        source.sendSuccess(() -> Component.literal("§7          生成高度：Y " + OreVeins.MIN_Y + " ~ " + OreVeins.MAX_Y), false);
-        source.sendSuccess(() -> Component.literal("§f    切换：§e/veinrebirth veins <true|false>"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.veins.header"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.veins.status",
+                Component.translatable(on
+                        ? "veinrebirth.cmd.veins.state.on"
+                        : "veinrebirth.cmd.veins.state.off")), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.veins.desc1"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.veins.desc2"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.veins.height",
+                OreVeins.MIN_Y, OreVeins.MAX_Y), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.veins.toggle"), false);
         return on ? 1 : 0;
     }
 
@@ -424,17 +435,18 @@ public final class OreGenCommand {
         } else if ("false".equalsIgnoreCase(raw) || "0".equals(raw) || "off".equalsIgnoreCase(raw)) {
             value = false;
         } else {
-            ctx.getSource().sendFailure(Component.literal("无法识别的取值：" + raw + "，请用 true 或 false"));
+            ctx.getSource().sendFailure(Component.translatable("veinrebirth.cmd.veins.bad_value", raw));
             return 0;
         }
         ConfigManager.setVeinOresEnabled(value);
         ConfigManager.save();
         ConfigManager.syncToAll();
-        ctx.getSource().sendSuccess(() -> Component.literal("§a[矿脉重生] §f原版大型矿脉已"
-                + (value ? "§a启用" : "§c禁用") + "§f，并已保存。"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("veinrebirth.cmd.veins.set",
+                Component.translatable(value
+                        ? "veinrebirth.cmd.veins.on"
+                        : "veinrebirth.cmd.veins.off")), true);
         if (!value) {
-            ctx.getSource().sendSuccess(() -> Component.literal(
-                    "§7提示：已生成过的区块请执行 §e/veinrebirth refresh 4§7 清除其中的矿脉方块。"), false);
+            ctx.getSource().sendSuccess(() -> Component.translatable("veinrebirth.cmd.veins.set_hint"), false);
         }
         return 1;
     }
@@ -444,17 +456,24 @@ public final class OreGenCommand {
     private static int info(CommandContext<CommandSourceStack> ctx) {
         OreType type = OreType.byId(StringArgumentType.getString(ctx, "ore"));
         if (type == null) {
-            ctx.getSource().sendFailure(Component.literal("未知矿物 id：" + StringArgumentType.getString(ctx, "ore")));
+            ctx.getSource().sendFailure(Component.translatable("veinrebirth.cmd.unknown_ore",
+                    StringArgumentType.getString(ctx, "ore")));
             return 0;
         }
         OreSettings settings = ConfigManager.get(type);
         CommandSourceStack source = ctx.getSource();
-        source.sendSuccess(() -> Component.literal("§6===== §e" + type.displayName() + " §7(" + type.id() + ") §6====="), false);
-        source.sendSuccess(() -> Component.literal("§f    启用(enabled) = §e" + settings.isEnabled()), false);
-        source.sendSuccess(() -> Component.literal("§f    数量(count)   = §e" + settings.getCount() + " §7条/区块"), false);
-        source.sendSuccess(() -> Component.literal("§f    规模(size)    = §e" + settings.getSize() + " §7方块/条"), false);
-        source.sendSuccess(() -> Component.literal("§f    权重(weight)  = §e" + settings.getWeight() + "%"), false);
-        source.sendSuccess(() -> Component.literal("§f    高度(min~max) = §e" + settings.getMinY() + " ~ " + settings.getMaxY()), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.info.header",
+                type.name(), type.id()), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.info.enabled",
+                String.valueOf(settings.isEnabled())), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.info.count",
+                settings.getCount()), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.info.size",
+                settings.getSize()), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.info.weight",
+                settings.getWeight()), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.info.height",
+                settings.getMinY(), settings.getMaxY()), false);
         return 1;
     }
 
@@ -464,13 +483,14 @@ public final class OreGenCommand {
         String oreId = StringArgumentType.getString(ctx, "ore");
         OreType type = OreType.byId(oreId);
         if (type == null) {
-            ctx.getSource().sendFailure(Component.literal("未知矿物 id：" + oreId));
+            ctx.getSource().sendFailure(Component.translatable("veinrebirth.cmd.unknown_ore", oreId));
             return 0;
         }
         String key = StringArgumentType.getString(ctx, "key").toLowerCase(Locale.ROOT);
         String value = StringArgumentType.getString(ctx, "value");
         if (!KEYS.contains(key)) {
-            ctx.getSource().sendFailure(Component.literal("未知字段：" + key + "，可用字段：" + String.join(", ", KEYS)));
+            ctx.getSource().sendFailure(Component.translatable("veinrebirth.cmd.set.unknown_key",
+                    key, String.join(", ", KEYS)));
             return 0;
         }
 
@@ -488,23 +508,36 @@ public final class OreGenCommand {
                 }
             }
         } catch (NumberFormatException e) {
-            ctx.getSource().sendFailure(Component.literal("无法识别的数值：" + value));
+            ctx.getSource().sendFailure(Component.translatable("veinrebirth.cmd.set.bad_value", value));
             return 0;
         }
 
         ConfigManager.save();
         ConfigManager.syncToAll();
-        ctx.getSource().sendSuccess(() -> Component.literal("§a[矿脉重生] §f" + type.displayName() + " 的 "
-                + key + " 已设置为 §e" + value + "§f，并已保存。"), true);
+        ctx.getSource().sendSuccess(() -> Component.translatable("veinrebirth.cmd.set.done",
+                type.name(), key, value), true);
         // 取消接管时提醒清理：世界里先前生成的方块不会自己消失。
         // 只在它确实被接管过（历史里有记录）时提示，避免从没接管过也来一句。
         if (type.modded() && "enabled".equals(key) && !settings.isEnabled()
                 && ConfigManager.everHandled().contains(type.id())) {
-            ctx.getSource().sendSuccess(() -> Component.literal(
-                    "§7已取消接管，但世界里先前生成的方块不会自动消失——"
-                            + "请用 §e/veinrebirth refresh <半径> clean §7清除残留。"), false);
+            ctx.getSource().sendSuccess(() -> Component.translatable("veinrebirth.cmd.set.unmanage_hint"),
+                    false);
         }
         return 1;
+    }
+
+    /**
+     * 分享码异常 → 玩家可读文案。
+     * <p>
+     * {@link ShareCode.ShareException} 自带翻译键，按玩家语言渲染；其它异常只能拿到原始消息，
+     * 原样显示（总比显示 null 强）。
+     */
+    private static Component reasonOf(IllegalArgumentException e) {
+        if (e instanceof ShareCode.ShareException share) {
+            return share.text();
+        }
+        String message = e.getMessage();
+        return Component.literal(message == null ? e.getClass().getSimpleName() : message);
     }
 
     private static boolean parseBoolean(String value) {
@@ -521,20 +554,21 @@ public final class OreGenCommand {
 
     private static int presetList(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack source = ctx.getSource();
-        source.sendSuccess(() -> Component.literal("§6===== §e预设方案 §7（点击条目即可套用）§6====="), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.preset.header"), false);
         for (Preset preset : Preset.values()) {
-            String text = "§e" + preset.displayName() + " §7(" + preset.id() + ") §8" + preset.description();
             String command = "/veinrebirth preset " + preset.id();
-            Component line = Component.literal(text).withStyle(Style.EMPTY
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command))
-                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                            Component.literal("§7点击套用「" + preset.displayName() + "」"))));
+            Component line = Component.literal("§e").append(preset.title())
+                    .append(Component.literal(" §7(" + preset.id() + ") §8"))
+                    .append(preset.desc())
+                    .withStyle(Style.EMPTY
+                            .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command))
+                            .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                    Component.translatable("veinrebirth.cmd.preset.click_hint",
+                                            preset.title()))));
             source.sendSuccess(() -> line, false);
         }
-        source.sendSuccess(() -> Component.literal(
-                "§7预设以出厂值为基准做倍率，反复套用同一个结果一致；未启用的矿物不会被改动。"), false);
-        source.sendSuccess(() -> Component.literal(
-                "§7套用后已有区块请用 §e/veinrebirth refresh 4 clean §7重建。"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.preset.note.scale"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.preset.note.refresh"), false);
         return Preset.values().length;
     }
 
@@ -542,8 +576,8 @@ public final class OreGenCommand {
         String raw = StringArgumentType.getString(ctx, "name");
         Preset preset = Preset.byId(raw);
         if (preset == null) {
-            ctx.getSource().sendFailure(Component.literal(
-                    "未知预设：" + raw + "，可用：" + String.join(" / ", Preset.IDS)));
+            ctx.getSource().sendFailure(Component.translatable("veinrebirth.cmd.preset.unknown",
+                    raw, String.join(" / ", Preset.IDS)));
             return 0;
         }
         Preset.apply(preset);
@@ -551,14 +585,12 @@ public final class OreGenCommand {
         ConfigManager.syncToAll();
 
         CommandSourceStack source = ctx.getSource();
-        source.sendSuccess(() -> Component.literal("§a[矿脉重生] §f已套用预设 §e" + preset.displayName()
-                + "§f：" + preset.description()), true);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.preset.applied",
+                preset.title(), preset.desc()), true);
         if (preset == Preset.VANILLA) {
-            source.sendSuccess(() -> Component.literal(
-                    "§7注意：「原版体验」的语义是恢复出厂，未启用的模组矿物也一并回到了「不接管」状态。"), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.preset.vanilla_note"), false);
         }
-        source.sendSuccess(() -> Component.literal(
-                "§7新生成的区块立即生效；已有区块请用 §e/veinrebirth refresh 4 clean §7重建。"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.after_apply_hint"), false);
         return 1;
     }
 
@@ -571,54 +603,53 @@ public final class OreGenCommand {
             code = ShareCode.encode();
         } catch (Throwable t) {
             VeinRebirthMod.LOGGER.error("[VeinRebirth] Share encode failed", t);
-            source.sendFailure(Component.literal("§c[矿脉重生] 生成分享码失败："
-                    + t.getClass().getSimpleName()));
+            source.sendFailure(Component.translatable("veinrebirth.cmd.share.encode_failed",
+                    t.getClass().getSimpleName()));
             return 0;
         }
 
-        source.sendSuccess(() -> Component.literal("§6===== §e分享码 §7（" + code.length()
-                + " 字符）§6====="), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.share.header",
+                code.length()), false);
 
         // 必须写清楚「按 T」：原版只在聊天栏打开着的时候才处理鼠标点击，而玩家回车执行命令后
         // 聊天栏会自动关闭 —— 此时分享码只是 HUD 左下角的一行贴纸，鼠标点上去毫无反应。
         // 不写这句，玩家十有八九会去点屏幕上那行字，然后以为复制功能是坏的。
-        source.sendSuccess(() -> Component.literal(
-                "§7按 §fT §7打开聊天栏，点击下面的 §b蓝色分享码§7 或 §b[复制]§7 按钮即可复制完整码。"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.share.howto"), false);
 
         // 码太长时聊天栏里只显示开头，但点击复制的始终是完整码
-        String display = code.length() <= CHAT_SAFE_LENGTH
-                ? code
-                : code.substring(0, PREVIEW_LENGTH) + "§8…（余下 "
-                        + (code.length() - PREVIEW_LENGTH) + " 字符已省略）";
+        boolean shortened = code.length() > CHAT_SAFE_LENGTH;
+        MutableComponent codeText = Component.literal("§b")
+                .append(shortened ? code.substring(0, PREVIEW_LENGTH) : code);
+        if (shortened) {
+            codeText.append(Component.translatable("veinrebirth.cmd.share.truncated",
+                    code.length() - PREVIEW_LENGTH));
+        }
         // 前缀按钮与码共用同一个可点击 Style，整行点哪儿都算
         Style copyStyle = Style.EMPTY
                 .withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, code))
                 .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                        Component.literal("§7点击复制完整分享码（" + code.length() + " 字符）")));
-        Component clickable = Component.literal("§b§n[复制]§r ")
+                        Component.translatable("veinrebirth.cmd.share.copy_hover", code.length())));
+        Component clickable = Component.translatable("veinrebirth.cmd.share.copy_button")
                 .withStyle(copyStyle)
-                .append(Component.literal("§b" + display).withStyle(copyStyle));
+                .append(codeText.withStyle(copyStyle));
         source.sendSuccess(() -> clickable, false);
 
         if (code.length() > CHAT_SAFE_LENGTH) {
-            source.sendSuccess(() -> Component.literal(
-                    "§7码较长，直接粘进聊天栏会被截断（原版上限 256 字符），用上面点击复制或下面的文件。"), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.share.long_hint"), false);
         }
 
         try {
             Path saved = ShareCode.writeToFile(code);
-            source.sendSuccess(() -> Component.literal("§7已写入文件：§f" + saved), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.share.file_written",
+                    saved.toString()), false);
         } catch (Exception e) {
             VeinRebirthMod.LOGGER.warn("[VeinRebirth] Failed to write share file", e);
-            source.sendSuccess(() -> Component.literal("§7（写入分享码文件失败，用上面的点击复制即可）"), false);
+            source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.share.file_failed"), false);
         }
 
-        source.sendSuccess(() -> Component.literal(
-                "§7自己要用也可以走 §e配置界面 → 预设方案 / 分享码 →「复制此码」§7，一键进剪贴板，不经过聊天栏。"), false);
-        source.sendSuccess(() -> Component.literal(
-                "§7对方用法：粘进「配置界面 → 预设方案 / 分享码」的输入框点导入，"), false);
-        source.sendSuccess(() -> Component.literal(
-                "§7或执行 §e/veinrebirth share import <码>§7；把文件放进对方 config/ 后可用 §e/veinrebirth share import file§7。"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.share.self_hint"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.share.other_hint"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.share.other_hint2"), false);
         return 1;
     }
 
@@ -632,11 +663,11 @@ public final class OreGenCommand {
             try {
                 code = ShareCode.readFromFile();
             } catch (IllegalArgumentException e) {
-                source.sendFailure(Component.literal("§c[矿脉重生] " + e.getMessage()));
+                source.sendFailure(Component.translatable("veinrebirth.cmd.error", reasonOf(e)));
                 return 0;
             } catch (Exception e) {
-                source.sendFailure(Component.literal("§c[矿脉重生] 读取分享码文件失败："
-                        + e.getClass().getSimpleName()));
+                source.sendFailure(Component.translatable("veinrebirth.cmd.share.read_failed",
+                        e.getClass().getSimpleName()));
                 return 0;
             }
         }
@@ -645,24 +676,23 @@ public final class OreGenCommand {
         try {
             result = ShareCode.importCode(code);
         } catch (IllegalArgumentException e) {
-            source.sendFailure(Component.literal("§c[矿脉重生] 导入失败：" + e.getMessage()));
+            source.sendFailure(Component.translatable("veinrebirth.cmd.share.import_failed", reasonOf(e)));
             if (!fromFile && raw.length() > CHAT_SAFE_LENGTH) {
-                source.sendSuccess(() -> Component.literal(
-                        "§7分享码较长时聊天栏会自动截断。建议改用 `§e/veinrebirth share import file§7`，"
-                                + "或在配置界面里粘贴导入。"), false);
+                source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.share.truncated_hint"), false);
             }
             return 0;
         } catch (Throwable t) {
             VeinRebirthMod.LOGGER.error("[VeinRebirth] Share import failed", t);
-            source.sendFailure(Component.literal("§c[矿脉重生] 导入失败：" + t.getClass().getSimpleName()));
+            source.sendFailure(Component.translatable("veinrebirth.cmd.share.import_failed",
+                    t.getClass().getSimpleName()));
             return 0;
         }
 
         ConfigManager.save();
         ConfigManager.syncToAll();
-        source.sendSuccess(() -> Component.literal("§a[矿脉重生] §f分享码导入成功：" + result.summary() + "。"), true);
-        source.sendSuccess(() -> Component.literal(
-                "§7新生成的区块立即生效；已有区块请用 §e/veinrebirth refresh 4 clean §7重建。"), false);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.share.import_ok",
+                result.summary()), true);
+        source.sendSuccess(() -> Component.translatable("veinrebirth.cmd.after_apply_hint"), false);
         return result.applied();
     }
 }
